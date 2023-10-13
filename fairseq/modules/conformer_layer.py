@@ -13,7 +13,7 @@ from fairseq.modules import (
     LayerNorm,
     MultiheadAttention,
     RelPositionMultiHeadedAttention,
-    RotaryPositionMultiHeadedAttention,
+    RotaryPositionMultiHeadedAttention
 )
 from fairseq.utils import get_activation_fn
 
@@ -27,9 +27,11 @@ class ConvolutionModule(torch.nn.Module):
         channels,
         depthwise_kernel_size,
         dropout,
+        norm_type="batch",
         activation_fn="swish",
         bias=False,
         export=False,
+        group_norm_num_groups=1
     ):
         """
         Args:
@@ -64,7 +66,7 @@ class ConvolutionModule(torch.nn.Module):
             groups=channels,
             bias=bias,
         )
-        self.batch_norm = torch.nn.BatchNorm1d(channels)
+        self.batch_norm = self._get_norm_from_cfg(norm_type,channels,group_norm_num_groups)
         self.activation = get_activation_fn(activation_fn)(channels)
         self.pointwise_conv2 = torch.nn.Conv1d(
             channels,
@@ -75,6 +77,13 @@ class ConvolutionModule(torch.nn.Module):
             bias=bias,
         )
         self.dropout = torch.nn.Dropout(dropout)
+
+    def _get_norm_from_cfg(self,norm_type,channels,group_norm_num_groups):
+        if norm_type == "batch":
+            return torch.nn.BatchNorm1d(channels)
+        if norm_type == "group":
+            return torch.nn.GroupNorm(group_norm_num_groups,channels)
+
 
     def forward(self, x):
         """
@@ -157,6 +166,8 @@ class ConformerEncoderLayer(torch.nn.Module):
         dropout,
         use_fp16,
         depthwise_conv_kernel_size=31,
+        conformer_norm_type="batch",
+        group_norm_num_groups=1,
         activation_fn="swish",
         attn_type=None,
         pos_enc_type="abs",
@@ -217,6 +228,8 @@ class ConformerEncoderLayer(torch.nn.Module):
             depthwise_kernel_size=depthwise_conv_kernel_size,
             dropout=dropout,
             activation_fn=activation_fn,
+            norm_type=conformer_norm_type,
+            group_norm_num_groups=group_norm_num_groups
         )
 
         self.ffn2 = FeedForwardModule(

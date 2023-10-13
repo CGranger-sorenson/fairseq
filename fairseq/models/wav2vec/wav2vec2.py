@@ -39,6 +39,7 @@ from .utils import pad_to_multiple
 EXTRACTOR_MODE_CHOICES = ChoiceEnum(["default", "layer_norm"])
 MASKING_DISTRIBUTION_CHOICES = ChoiceEnum(["static", "uniform", "normal", "poisson"])
 LAYER_TYPE_CHOICES = ChoiceEnum(["transformer", "conformer", "trf_adp"])
+CONFORMER_NORM_CHOICES = ChoiceEnum(["batch","group"])
 
 
 @dataclass
@@ -68,6 +69,12 @@ class Wav2Vec2Config(FairseqDataclass):
     )
     layer_type: LAYER_TYPE_CHOICES = field(
         default="transformer", metadata={"help": "layer type in encoder"}
+    )
+    conformer_norm_type: CONFORMER_NORM_CHOICES = field(
+        default="batch", metadata={"help": "norm layer type in conformer convolution module"}
+    )
+    group_norm_num_groups: int = field(
+        default=1, metadata={"help": "number of groups for group norm"}
     )
     # dropouts
     dropout: float = field(
@@ -1183,6 +1190,8 @@ class ConformerEncoder(TransformerEncoder):
             attn_type=args.attn_type,
             pos_enc_type=args.pos_enc_type,
             use_fp16=args.fp16,  # only used for rope
+            group_norm_num_groups=args.group_norm_num_groups,
+            conformer_norm_type=args.conformer_norm_type
         )
         layer = fsdp_wrap(layer)
         if args.checkpoint_activations:
